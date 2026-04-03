@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>RULL Payment | Konfirmasi Pembayaran</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style_tema.css">
+    <script src="config.js"></script>
+</head>
+<body>
+<div class="bg-particle" id="particles"></div>
+<div class="payment-container">
+    <div class="store-header" id="profileClickArea">
+        <img class="store-logo" id="storeLogo" src="" alt="Logo">
+        <h1 id="storeName"></h1>
+        <p id="storeTagline"></p>
+    </div>
+    <div class="method-section">
+        <div class="section-label"><i class="fas fa-wallet"></i> Silakan pilih metode pembayaran</div>
+        <div class="payment-methods" id="paymentMethods"></div>
+    </div>
+    <div class="dynamic-content" id="dynamicScene"></div>
+    <div class="warning-box">
+        <div class="warning-title"><i class="fas fa-exclamation-triangle"></i> Baca Sebelum Pembayaran!</div>
+        <p><i class="fas fa-camera"></i> Sertakan screenshot pembayaran jika tidak ada bukti screenshot maka saya anggap tidak membayar!</p>
+    </div>
+    <div class="action-buttons">
+        <button class="btn-primary" id="confirmPaymentBtn"><i class="fas fa-arrow-right"></i> Lanjutkan Pembayaran</button>
+    </div>
+    <div class="footer">© 2024 Rull Payment Store - Terima kasih telah berbelanja</div>
+</div>
+
+<div id="confirmModal" class="modal-qris">
+    <div class="modal-content">
+        <h3 style="color:white; margin-bottom:1rem;"><i class="fab fa-whatsapp"></i> Konfirmasi</h3>
+        <p style="color:#bbd9ff; margin-bottom:1rem;">Pesan akan dikirim ke admin WhatsApp</p>
+        <div style="background:#0a0f1a; border-radius:1rem; padding:0.8rem; margin:1rem 0; text-align:left;">
+            <p style="color:#90c0ff; font-size:0.7rem;">Pesan yang akan dikirim:</p>
+            <p style="color:white; font-size:0.75rem; font-family:monospace; word-break:break-word; white-space:pre-line;" id="previewMessageText"></p>
+        </div>
+        <div class="btn-group">
+            <button id="confirmSendBtn" style="background:#25D366; padding:10px 20px; border-radius:40px; border:none; color:white; font-weight:600; cursor:pointer;"><i class="fab fa-whatsapp"></i> Kirim</button>
+            <button id="cancelSendBtn" style="background:#2c3e66; padding:10px 20px; border-radius:40px; border:none; color:white; cursor:pointer;">Batal</button>
+        </div>
+    </div>
+</div>
+
+<div id="qrisModal" class="modal-qris">
+    <div class="modal-content">
+        <div id="modalQrisContainer"></div>
+        <div class="btn-group">
+            <button id="downloadModalBtn" style="background:#2c3e66; padding:8px 16px; border-radius:40px; color:white;">Unduh QRIS</button>
+            <button id="closeModalBtn" style="background:#2c3e66; padding:8px 16px; border-radius:40px; color:white;">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<div id="profileModal" class="modal-profile">
+    <div class="profile-card">
+        <img id="profileModalLogo" src="" alt="Logo">
+        <h2 id="profileModalName"></h2>
+        <p id="profileModalTagline"></p>
+        <div class="close-profile-note"><i class="fas fa-arrow-left"></i> Klik di luar area ini atau tekan tombol kembali untuk menutup</div>
+    </div>
+</div>
+
+<div id="toastMsg" class="toast-msg"></div>
+
+<script>
+    const config = STORE_CONFIG;
+    
+    document.getElementById('storeLogo').src = config.storeLogo;
+    document.getElementById('storeName').innerText = config.storeName;
+    document.getElementById('storeTagline').innerText = config.storeTagline;
+    document.getElementById('profileModalLogo').src = config.storeLogo;
+    document.getElementById('profileModalName').innerHTML = `<i class="fas fa-bolt"></i> ${config.storeName}`;
+    document.getElementById('profileModalTagline').innerText = config.storeTagline;
+    
+    let activeMethod = 'qris';
+    
+    function showToast(msg, duration = 2500) {
+        const toast = document.getElementById('toastMsg');
+        toast.innerText = msg;
+        toast.style.opacity = '1';
+        setTimeout(() => { toast.style.opacity = '0'; }, duration);
+    }
+    
+    function renderMethodButtons() {
+        const container = document.getElementById('paymentMethods');
+        container.innerHTML = '';
+        Object.keys(config.methods).forEach(key => {
+            const m = config.methods[key];
+            const card = document.createElement('div');
+            card.className = `method-card ${activeMethod === key ? 'active' : ''}`;
+            card.innerHTML = `<img src="${m.logoUrl}" alt="${m.name}"><span>${m.name}</span>`;
+            card.addEventListener('click', () => {
+                if (activeMethod === key) return;
+                activeMethod = key;
+                renderMethodButtons();
+                renderDynamicScene();
+                showToast(`Berpindah ke ${m.name}`, 1200);
+            });
+            container.appendChild(card);
+        });
+    }
+    
+    function renderDynamicScene() {
+        const method = config.methods[activeMethod];
+        const scene = document.getElementById('dynamicScene');
+        if (activeMethod === 'qris') {
+            scene.innerHTML = `
+                <div class="scene-card">
+                    <div class="qris-box" id="qrisClickArea"><img src="${method.qrisImageUrl}" id="qrisImageElem"></div>
+                    <div class="btn-download-qris" id="downloadQrisBtn"><i class="fas fa-download"></i> Simpan QRIS ke Galeri</div>
+                    <p style="font-size:0.7rem; margin-top:8px; color:#bbddff;">✨ Klik QRIS untuk memperbesar ✨</p>
+                    <div class="payment-number-card">
+                        <h4><i class="fas fa-store"></i> Pemilik Merchant</h4>
+                        <div class="owner-name">${method.owner}</div>
+                        <div class="big-number">Scan QR Code</div>
+                        <div class="note-text">Scan QR Code untuk membayar</div>
+                    </div>
+                </div>
+            `;
+            document.getElementById('qrisClickArea')?.addEventListener('click', () => openQrisZoomModal(method.qrisImageUrl));
+            document.getElementById('downloadQrisBtn')?.addEventListener('click', (e) => { e.stopPropagation(); downloadQrisImage(method.qrisImageUrl); });
+        } else {
+            scene.innerHTML = `
+                <div class="scene-card">
+                    <img src="${method.logoUrl}" style="width:55px;height:55px;margin:0 auto 10px;object-fit:contain;">
+                    <h4 style="color:white; margin-bottom:8px;">Pembayaran via ${method.name}</h4>
+                    <div class="owner-name">Nama Penerima: ${method.owner}</div>
+                    <div class="big-number" id="copyNumber">${method.accountNumber}</div>
+                    <div style="background:#0e1a32; border-radius:50px; padding:6px; margin-top:8px;">
+                        <span style="color:#d0e4ff; font-weight:500;">Nomor : ${method.accountNumber}</span>
+                    </div>
+                    <p style="font-size:0.7rem; margin-top:12px; color:#bbddff;"><i class="fas fa-copy"></i> Klik nomor untuk salin</p>
+                </div>
+            `;
+            document.getElementById('copyNumber')?.addEventListener('click', () => {
+                copyToClipboard(method.accountNumber);
+                showToast(`Nomor ${method.name} disalin: ${method.accountNumber}`, 1800);
+            });
+        }
+    }
+    
+    function copyToClipboard(text) {
+        if (navigator.clipboard) navigator.clipboard.writeText(text);
+        else { const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); }
+    }
+    
+    async function downloadQrisImage(imgSrc) {
+        if (!imgSrc) return showToast("Gambar tidak ditemukan", 1500);
+        try {
+            const response = await fetch(imgSrc);
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `qris_rullpay.png`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast("✅ QRIS berhasil diunduh! Cek folder Downloads", 2500);
+        } catch { const link = document.createElement('a'); link.download = `qris_rullpay.png`; link.href = imgSrc; link.click(); showToast("✅ QRIS diunduh", 2000); }
+    }
+    
+    async function openQrisZoomModal(imgSrc) {
+        const modal = document.getElementById('qrisModal');
+        const container = document.getElementById('modalQrisContainer');
+        if (!imgSrc) return;
+        container.innerHTML = `<img src="${imgSrc}" style="width:100%;max-width:240px;border-radius:24px;background:white;padding:12px;">`;
+        modal.classList.add('active');
+        document.getElementById('downloadModalBtn').onclick = () => { const link = document.createElement('a'); link.download = `qris_zoom.png`; link.href = imgSrc; link.click(); showToast("QRIS diunduh", 1500); };
+        document.getElementById('closeModalBtn').onclick = () => modal.classList.remove('active');
+    }
+    
+    function generateWAMessage() {
+        const method = config.methods[activeMethod];
+        let detailText = activeMethod === 'qris' ? "Pembayaran via QRIS" : `${method.name} - No: ${method.accountNumber} a.n ${method.owner}`;
+        return `*KONFIRMASI PEMBAYARAN RULL PAYMENT STORE*%0A%0A` +
+            `Metode: ${method.name}%0A` +
+            `Detail: ${detailText}%0A` +
+            `Pesan: CUMA PREVIEW ✅%0A%0A` +
+            `*Pembayaran sedang dalam pengecekan.*`;
+    }
+    
+    function showPreviewAndConfirm() {
+        const method = config.methods[activeMethod];
+        let detailText = activeMethod === 'qris' ? "Pembayaran via QRIS" : `${method.name} - No: ${method.accountNumber} a.n ${method.owner}`;
+        const previewText = `*KONFIRMASI PEMBAYARAN RULL PAYMENT STORE*\n\nMetode: ${method.name}\nDetail: ${detailText}\nPesan: CUMA PREVIEW ✅\n\n*Pembayaran sedang dalam pengecekan.*`;
+        document.getElementById('previewMessageText').innerText = previewText;
+        document.getElementById('confirmModal').classList.add('active');
+    }
+    
+    function sendToWhatsApp() {
+        const waUrl = `https://wa.me/${config.whatsappNumber}?text=${generateWAMessage()}`;
+        window.open(waUrl, '_blank');
+        showToast("✅ Pesan terkirim! Tunggu konfirmasi dari admin", 3000);
+    }
+    
+    document.getElementById('confirmPaymentBtn').addEventListener('click', showPreviewAndConfirm);
+    document.getElementById('confirmSendBtn').addEventListener('click', () => {
+        document.getElementById('confirmModal').classList.remove('active');
+        sendToWhatsApp();
+    });
+    document.getElementById('cancelSendBtn').addEventListener('click', () => {
+        document.getElementById('confirmModal').classList.remove('active');
+    });
+    
+    document.getElementById('profileClickArea').addEventListener('click', () => {
+        document.getElementById('profileModal').classList.add('active');
+    });
+    document.getElementById('profileModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('profileModal')) {
+            document.getElementById('profileModal').classList.remove('active');
+        }
+    });
+    
+    function createParticles() {
+        const container = document.getElementById('particles');
+        for (let i = 0; i < 55; i++) {
+            const p = document.createElement('div');
+            p.classList.add('particle');
+            const size = Math.random() * 7 + 2;
+            p.style.width = `${size}px`;
+            p.style.height = `${size}px`;
+            p.style.left = `${Math.random() * 100}%`;
+            p.style.animationDuration = `${Math.random() * 20 + 10}s`;
+            p.style.animationDelay = `${Math.random() * 12}s`;
+            p.style.background = `rgba(100, 180, 255, ${Math.random() * 0.5 + 0.1})`;
+            container.appendChild(p);
+        }
+    }
+    
+    renderMethodButtons();
+    renderDynamicScene();
+    createParticles();
+    
+    window.onclick = (e) => {
+        const qrisModal = document.getElementById('qrisModal');
+        const confirmModal = document.getElementById('confirmModal');
+        if (e.target === qrisModal) qrisModal.classList.remove('active');
+        if (e.target === confirmModal) confirmModal.classList.remove('active');
+    };
+</script>
+</body>
+</html>
